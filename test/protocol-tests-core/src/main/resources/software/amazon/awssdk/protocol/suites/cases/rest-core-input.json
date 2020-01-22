@@ -32,6 +32,22 @@
     }
   },
   {
+    "description": "Content type header is set to application/json for a POST request",
+    "when": {
+      "action": "marshall",
+      "operation": "AllTypes"
+    },
+    "then": {
+      "serializedAs": {
+        "headers": {
+          "contains": {
+            "content-type": "application/json"
+          }
+        }
+      }
+    }
+  },
+  {
     "description": "Scalars in headers are marshalled correctly",
     "given": {
       "input": {
@@ -465,6 +481,24 @@
           "contains": {
             "param": [null]
           }
+        }
+      }
+    }
+  },
+  {
+    "description": "GET operation does not have content-type header",
+    "given": {
+      "input": {
+      }
+    },
+    "when": {
+      "action": "marshall",
+      "operation": "StatusCodeInOutputOperation"
+    },
+    "then": {
+      "serializedAs": {
+        "headers": {
+          "doesNotContain": [ "content-type" ]
         }
       }
     }
