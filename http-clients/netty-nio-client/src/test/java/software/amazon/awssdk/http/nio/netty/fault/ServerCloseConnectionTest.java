@@ -17,7 +17,7 @@ package software.amazon.awssdk.http.nio.netty.fault;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static software.amazon.awssdk.http.SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -46,6 +46,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.reactivex.Flowable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
@@ -107,7 +108,10 @@ public class ServerCloseConnectionTest {
         server.ackPingOnFirstChannel = true;
         // The first request picks up a bad channel and should fail. Channel 1
         CompletableFuture<Void> firstRequest = sendGetRequest();
-        assertThatThrownBy(() -> firstRequest.join()).hasRootCauseInstanceOf(ClosedChannelException.class);
+        assertThatThrownBy(() -> firstRequest.join())
+            .hasMessageContaining("An error occurred on the connection")
+            .hasCauseInstanceOf(IOException.class)
+            .hasRootCauseInstanceOf(ClosedChannelException.class);
 
         server.failOnFirstChannel = false;
 

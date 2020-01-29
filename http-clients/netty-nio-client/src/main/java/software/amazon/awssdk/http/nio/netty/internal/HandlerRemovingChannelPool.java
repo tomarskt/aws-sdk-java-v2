@@ -83,8 +83,7 @@ public class HandlerRemovingChannelPool implements ChannelPool {
                            FlushOnReadHandler.class,
                            ResponseHandler.class,
                            ReadTimeoutHandler.class,
-                           WriteTimeoutHandler.class,
-                           UnusedChannelExceptionHandler.class);
+                           WriteTimeoutHandler.class);
         }
     }
 }

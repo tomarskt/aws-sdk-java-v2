@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.http.nio.netty.internal.ResponseHandler;
+import software.amazon.awssdk.http.nio.netty.internal.UnusedChannelExceptionHandler;
 import software.amazon.awssdk.utils.Logger;
 
 /**
@@ -107,6 +107,7 @@ public class MultiplexedChannelRecord {
                 }
 
                 Http2StreamChannel channel = future.getNow();
+                channel.pipeline().addLast(UnusedChannelExceptionHandler.getInstance());
                 childChannels.put(channel.id(), channel);
                 promise.setSuccess(channel);
 
@@ -185,19 +186,16 @@ public class MultiplexedChannelRecord {
      * Delivers the exception to all registered child channels, and prohibits new streams being created on this connection.
      */
     void closeChildChannels(Throwable t) {
-        closeAndExecuteOnChildChannels(ch -> {
-            RuntimeException ioException = new RuntimeException("An exception occurred on the connection ", t);
+        closeAndExecuteOnChildChannels(ch -> ch.pipeline().fireExceptionCaught(decorateConnectionException(t)));
+    }
 
-            // Deliver the exception only if the channel knows to handle the exception
-            if (ch.pipeline().get(ResponseHandler.class) != null) {
-                log.debug(() -> "Delivering exception to child channel " + ch + ioException);
-                ch.pipeline().fireExceptionCaught(ioException);
-            } else {
-                log.debug(() -> "Closing child channel " + ch + ioException);
-                ch.close();
-            }
+    private Throwable decorateConnectionException(Throwable t) {
+        String message = "An error occurred on the connection: " + t.getMessage();
+        if (IOException.class.isAssignableFrom(t.getClass())) {
+            return new IOException(message, t);
+        }
 
-        });
+        return new Throwable(message, t);
     }
 
     private void closeAndExecuteOnChildChannels(Consumer<Channel> childChannelConsumer) {

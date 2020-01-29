@@ -39,7 +39,7 @@ import org.junit.Test;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey;
 import software.amazon.awssdk.http.nio.netty.internal.MockChannel;
-import software.amazon.awssdk.http.nio.netty.internal.ResponseHandler;
+import software.amazon.awssdk.http.nio.netty.internal.UnusedChannelExceptionHandler;
 
 public class MultiplexedChannelRecordTest {
     private EventLoopGroup loopGroup;
@@ -198,34 +198,7 @@ public class MultiplexedChannelRecordTest {
     }
 
     @Test
-    public void closeChildChannels_noResponseHandler_shouldClose() throws ExecutionException, InterruptedException {
-        EmbeddedChannel channel = newHttp2Channel();
-        loopGroup.register(channel).awaitUninterruptibly();
-        Promise<Channel> channelPromise = new DefaultPromise<>(loopGroup.next());
-        channelPromise.setSuccess(channel);
-
-        MultiplexedChannelRecord record = new MultiplexedChannelRecord(channel, 2, Duration.ofSeconds(10));
-
-
-        Promise<Channel> streamPromise = channel.eventLoop().newPromise();
-        Promise<Channel> streamPromise2 = channel.eventLoop().newPromise();
-        record.acquireStream(streamPromise);
-        record.acquireStream(streamPromise2);
-
-        channel.runPendingTasks();
-
-        IOException ioException = new IOException("foobar");
-        record.closeChildChannels(ioException);
-
-        Channel childChannel1 = streamPromise.get();
-        Channel childChannel2 = streamPromise.get();
-
-        assertThat(childChannel1.isOpen()).isFalse();
-        assertThat(childChannel2.isOpen()).isFalse();
-    }
-
-    @Test
-    public void closeChildChannels_hasResponseHandler_shouldDeliverException() throws ExecutionException, InterruptedException {
+    public void closeChildChannels_shouldDeliverException() throws ExecutionException, InterruptedException {
         EmbeddedChannel channel = newHttp2Channel();
         loopGroup.register(channel).awaitUninterruptibly();
         Promise<Channel> channelPromise = new DefaultPromise<>(loopGroup.next());
@@ -239,15 +212,18 @@ public class MultiplexedChannelRecordTest {
         channel.runPendingTasks();
         Channel childChannel = streamPromise.get();
         VerifyExceptionHandler verifyExceptionHandler = new VerifyExceptionHandler();
-        childChannel.pipeline().addLast(verifyExceptionHandler);
-        childChannel.pipeline().addLast(ResponseHandler.getInstance());
+        childChannel.pipeline().addFirst(verifyExceptionHandler);
 
         IOException ioException = new IOException("foobar");
         record.closeChildChannels(ioException);
 
+        assertThat(childChannel.pipeline().get(UnusedChannelExceptionHandler.class)).isNotNull();
+
         assertThat(verifyExceptionHandler.exceptionCaught).hasStackTraceContaining("foobar")
                                                           .hasRootCauseInstanceOf(IOException.class);
-        assertThat(childChannel.isOpen()).isTrue();
+
+        // should be closed by UnusedChannelExceptionHandler
+        assertThat(childChannel.isOpen()).isFalse();
     }
 
     private static final class VerifyExceptionHandler extends ChannelInboundHandlerAdapter {
@@ -255,6 +231,7 @@ public class MultiplexedChannelRecordTest {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             exceptionCaught = cause;
+            ctx.fireExceptionCaught(cause);
         }
     }
 

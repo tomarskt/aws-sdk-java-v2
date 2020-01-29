@@ -178,7 +178,6 @@ public final class NettyRequestExecutor {
         }
         pipeline.addLast(new HttpStreamsClientHandler());
         pipeline.addLast(ResponseHandler.getInstance());
-        pipeline.addLast(UnusedChannelExceptionHandler.getInstance());
 
         // It's possible that the channel could become inactive between checking it out from the pool, and adding our response
         // handler (which will monitor for it going inactive from now on).
