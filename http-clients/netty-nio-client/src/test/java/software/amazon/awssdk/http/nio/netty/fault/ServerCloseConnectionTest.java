@@ -46,7 +46,6 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.reactivex.Flowable;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
@@ -108,7 +107,7 @@ public class ServerCloseConnectionTest {
         server.ackPingOnFirstChannel = true;
         // The first request picks up a bad channel and should fail. Channel 1
         CompletableFuture<Void> firstRequest = sendGetRequest();
-        assertThatThrownBy(() -> firstRequest.join()).hasCauseInstanceOf(ClosedChannelException.class);
+        assertThatThrownBy(() -> firstRequest.join()).hasRootCauseInstanceOf(ClosedChannelException.class);
 
         server.failOnFirstChannel = false;
 
